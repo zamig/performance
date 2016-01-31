@@ -10,12 +10,12 @@ windowed_length <- function(t){
   function(data_point){
     lower = as.numeric(data_point$start_time)
     upper = as.numeric(data_point$end_time)
-#     print(t)
-#     print(lower)
-#     print(upper)
-#     print(min(t + H, upper))
-#     print(max(t - H, lower))
-#     print(H)
+     #print(t)
+     #print(lower)
+     #print(upper)
+     #print(min(t + H, upper))
+     #print(max(t - H, lower))
+     #print(H)
     return(max(0, min(t + H, upper)- max(t - H, lower)))
   }
 }
@@ -69,7 +69,7 @@ create_time_mats <- function(data, names = c("shifts_len", "trips_len", "total_i
   return(mats)
 }
 
-create_rates <- function(mats, data = c("trips_len", "total_inc"), 
+create_rates_old <- function(mats, data = c("trips_len", "total_inc"), 
                          bases = c("shifts_len", "shifts_len"),
                          names = c("occup", "inc"), app.date = as.Date("2015-11-23")){
   
@@ -82,7 +82,7 @@ create_rates <- function(mats, data = c("trips_len", "total_inc"),
     return(m)
   }
   
-  calc_ecdf <- function(mat, sd = 0.01){
+  calc_ecdf <- function(mat, sd = 0.001){
     n_mat = matrix(rnorm(nrow(mat) * ncol(mat), sd = sd), nrow = nrow(mat))
     apply(mat + n_mat, 2, ecdf)
   }
@@ -131,6 +131,8 @@ create_rates <- function(mats, data = c("trips_len", "total_inc"),
   #ecdf_all = lapply(raw_pre, calc_ecdf)
   ecdf_weekdays = lapply(raw_pre_weekdays, calc_ecdf)
   ecdf_weekends = lapply(raw_pre_weekends, calc_ecdf)
+  names(ecdf_weekdays) = paste0(names, "_ecdf_weekdays")
+  names(ecdf_weekends) = paste0(names, "_ecdf_weekends")
   
   rates_weekdays = lapply(1:n, function(x) calc_rates(raw_weekdays[[x]], ecdf_weekdays[[x]], datesSeq[dates_weekdays]))
   rates_weekends = lapply(1:n, function(x) calc_rates(raw_weekends[[x]], ecdf_weekends[[x]], datesSeq[dates_weekends]))
@@ -163,7 +165,7 @@ create_rates <- function(mats, data = c("trips_len", "total_inc"),
   results = c(raw_data, raw_pre, raw_post, raw_pre_weekdays, raw_pre_weekends, raw_post_weekdays, raw_post_weekends,
               rates_weekdays, rates_weekends, rates_pre_weekdays, rates_pre_weekends, rates_post_weekdays, 
               rates_post_weekends, vecrates_weekdays, vecrates_weekends, vecrates_pre_weekdays, vecrates_pre_weekends, 
-              vecrates_post_weekdays, vecrates_post_weekends)
+              vecrates_post_weekdays, vecrates_post_weekends, ecdf_weekdays, ecdf_weekends)
   
 }
 
@@ -179,8 +181,8 @@ processData <- function(data){
 
 #####################################################################################
 
-create_rates2 <- function(mats, data = c("trips_len", "total_inc"), 
-                         bases = c("shifts_len", "shifts_len"),
+create_rates <- function(mats, r_data = c("trips_len", "total_inc"), 
+                         r_bases = c("shifts_len", "shifts_len"),
                          names = c("occup", "inc"), app.date = as.Date("2015-11-23")){
   
   div_mats <- function(data, base){
@@ -192,15 +194,20 @@ create_rates2 <- function(mats, data = c("trips_len", "total_inc"),
     return(m)
   }
   
-  calc_ecdf <- function(mat, sd = 0.01){
+  calc_ecdf <- function(mat, sd = 0.001){
     n_mat = matrix(rnorm(nrow(mat) * ncol(mat), sd = sd), nrow = nrow(mat))
     apply(mat + n_mat, 2, ecdf)
   }
   
-  
-  calc_rates <- function(mat, ecdf_fun, dates){
+  calc_rates <- function(mat, ecdf_fun_w.days, ecdf_fun_w.ends){
+    
+    ecdf_fun <- function(mat, fun1, fun2, dates1){
+      ifelse(dates1, fun1(mat), fun2(mat))
+    }
+    
     n.times = length(USED.TIMES$time)
-    zoo(sapply(1:n.times, function(x) ecdf_fun[[x]](mat[, x])), dates)
+    zoo(sapply(1:n.times, function(x) ecdf_fun(mat[, x], ecdf_fun_w.days[[x]], ecdf_fun_w.ends[[x]], 
+                                               datesSeq %in% dates_weekdays)), datesSeq)
   }
   
   vect_data <- function(mat){
@@ -209,85 +216,71 @@ create_rates2 <- function(mats, data = c("trips_len", "total_inc"),
     return(v)
   }
   
-  split_dates <- function(data, name){
+  split_dates <- function(data, vect = FALSE){
     
-    pre = data[dates_pre]
-    post = data[dates_post]
-    names(pre) = paste0(name, "_pre")
-    names(post) = paste0(name, "_post")
+    if (vect){
+      idx = vect_date(data)
+    } else {
+      idx = index(data)
+    }
     
-    weekdays = data[dates_weekdays]
-    weekends = data[dates_weekends]
-    names(weekdays) = paste0(name, "_w-days")
-    names(weekends) = paste0(name, "_w-ends")
+    pre = data[idx %in% dates_pre]
+    post = data[idx %in% dates_post]
     
-    pre_weekdays = data[dates_pre & dates_weekdays]
-    pre_weekends = data[dates_pre & dates_weekends]
-    post_weekdays = data[dates_post & dates_weekdays]
-    post_weekends = data[dates_post & dates_weekends]
-    names(pre_weekdays) = paste0(name, "_pre_w-days")
-    names(pre_weekends) = paste0(name, "_pre_w-ends")
-    names(post_weekends) = paste0(name, "_post_w-ends")
-    names(post_weekdays) = paste0(name, "_post_w-days")
+    pre_name = "pre"
+    post_name = "post"
     
-    return(c(pre, post, weekdays, weekends, pre_weekdays, pre_weekends, post_weekdays, post_weekends))
+    weekdays = data[idx %in% dates_weekdays]
+    weekends = data[idx %in% dates_weekends]
+    weekdays_name = "w.days"
+    weekends_name = "w.ends"
+    
+    pre_weekdays = data[(idx %in% dates_pre) & (idx %in% dates_weekdays)]
+    pre_weekends = data[(idx %in% dates_pre) & (idx %in% dates_weekends)]
+    post_weekdays = data[(idx %in% dates_post) & (idx %in% dates_weekdays)]
+    post_weekends = data[(idx %in% dates_post) & (idx %in% dates_weekends)]
+    pre_weekdays_name = "pre_w.days"
+    pre_weekends_name = "pre_w.ends"
+    post_weekends_name = "post_w.ends"
+    post_weekdays_name = "post_w.days"
+    
+    res = list(pre, post, weekdays, weekends, pre_weekdays, pre_weekends, post_weekdays, post_weekends)
+    names(res) = c(pre_name, post_name, weekdays_name, weekends_name, pre_weekdays_name, 
+             pre_weekends_name, post_weekdays_name, post_weekends_name)
+    return(res)
   }
   
-  n = length(data)
+  add_data <- function(data, vect = FALSE){
+    return(c(list(data = data), split_dates(data, vect)))
+  }
+  
+  n = length(r_data)
   datesSeq = index(mats[[1]])
-  dates_weekdays = !wday(datesSeq) %in% c(1,7)
-  dates_weekends = wday(datesSeq) %in% c(1,7)
-  dates_pre = datesSeq < app.date
-  dates_post = datesSeq >= app.date
-  dates_weekdays_pre = datesSeq[dates_weekdays] < app.date
-  dates_weekdays_post = datesSeq[dates_weekdays] >= app.date
-  dates_weekends_pre = datesSeq[dates_weekends] < app.date
-  dates_weekends_post = datesSeq[dates_weekends] >= app.date
+  dates_weekdays = datesSeq[!wday(datesSeq) %in% c(1,7)]
+  dates_weekends = datesSeq[wday(datesSeq) %in% c(1,7)]
+  dates_pre = datesSeq[datesSeq < app.date]
+  dates_post = datesSeq[datesSeq >= app.date]
   
-  res = list()
-  
+  res = vector("list", n)
   for (i in 1:n){
     
-    raw_data = div_mats(mats[[data[i]]], mats[[bases[i]]])
-    names(raw_data) = "raw"
+    raw_res = add_data(div_mats(mats[[r_data[i]]], mats[[r_bases[i]]]))
     
-    c_res = list(raw_data, split(raw_data))
+    ecdf_w.days = calc_ecdf(raw_res$pre_w.days)
+    ecdf_w.ends = calc_ecdf(raw_res$pre_w.ends)
     
-    #ecdf_all = lapply(raw_pre, calc_ecdf)
-    ecdf_weekdays = lapply(raw_pre_weekdays, calc_ecdf)
-  ecdf_weekends = lapply(raw_pre_weekends, calc_ecdf)
+    rates_res = add_data(calc_rates(raw_res$data, ecdf_w.days, ecdf_w.ends))
+    vect_raw_res = add_data(vect_data(raw_res$data), vect = TRUE)
+    vect_rates_res = add_data(vect_data(rates_res$data), vect = TRUE)
+    daily_raw_res = add_data(zoo(apply(raw_res$data, 1, mean, na.rm = T), datesSeq))
+    daily_rates_res = add_data(zoo(apply(rates_res$data, 1, mean, na.rm = T), datesSeq))
+    
+    res[[i]] = list(raw = raw_res, rates = rates_res, vect_raw = vect_raw_res, 
+                    vect_rates = vect_rates_res, daily_raw = daily_raw_res, daily_rates = daily_rates_res,
+                    ecdf_w.days = ecdf_w.days, ecdf_w.ends = ecdf_w.ends)
+  }
   
-  rates_weekdays = lapply(1:n, function(x) calc_rates(raw_weekdays[[x]], ecdf_weekdays[[x]], datesSeq[dates_weekdays]))
-  rates_weekends = lapply(1:n, function(x) calc_rates(raw_weekends[[x]], ecdf_weekends[[x]], datesSeq[dates_weekends]))
-  names(rates_weekdays) = paste0(names, "_rates_weekdays")
-  names(rates_weekends) = paste0(names, "_rates_weekends")
-  
-  rates_pre_weekdays = lapply(rates_weekdays, function(x) x[datesSeq[dates_weekdays] < app.date])
-  rates_pre_weekends = lapply(rates_weekends, function(x) x[datesSeq[dates_weekends] < app.date])
-  rates_post_weekdays = lapply(rates_weekdays, function(x) x[!datesSeq[dates_weekdays] < app.date])
-  rates_post_weekends = lapply(rates_weekends, function(x) x[!datesSeq[dates_weekends] < app.date])
-  names(rates_pre_weekdays) = paste0(names, "_rates_pre_weekdays")
-  names(rates_pre_weekends) = paste0(names, "_rates_pre_weekends")
-  names(rates_post_weekdays) = paste0(names, "_rates_post_weekdays")
-  names(rates_post_weekends) = paste0(names, "_rates_post_weekends")
-  
-  vecrates_weekdays = lapply(rates_weekdays, vect_data)
-  vecrates_weekends = lapply(rates_weekends, vect_data)
-  names(vecrates_weekdays) = paste0(names, "_vec_rates_weekdays")
-  names(vecrates_weekends) = paste0(names, "_vec_rates_weekends")
-  
-  vecrates_pre_weekdays = lapply(rates_pre_weekdays, vect_data)
-  vecrates_pre_weekends = lapply(rates_pre_weekends, vect_data)
-  vecrates_post_weekdays = lapply(rates_post_weekdays, vect_data)
-  vecrates_post_weekends = lapply(rates_post_weekends, vect_data)
-  names(vecrates_pre_weekdays) = paste0(names, "_vec_rates_pre_weekdays")
-  names(vecrates_pre_weekends) = paste0(names, "_vec_rates_pre_weekends")
-  names(vecrates_post_weekdays) = paste0(names, "_vec_rates_post_weekdays")
-  names(vecrates_post_weekends) = paste0(names, "_vec_rates_post_weekends")
-  
-  results = c(raw_data, raw_pre, raw_post, raw_pre_weekdays, raw_pre_weekends, raw_post_weekdays, raw_post_weekends,
-              rates_weekdays, rates_weekends, rates_pre_weekdays, rates_pre_weekends, rates_post_weekdays, 
-              rates_post_weekends, vecrates_weekdays, vecrates_weekends, vecrates_pre_weekdays, vecrates_pre_weekends, 
-              vecrates_post_weekdays, vecrates_post_weekends)
+  names(res) = names
+  return(res)
   
 }
