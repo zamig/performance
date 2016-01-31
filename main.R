@@ -19,7 +19,7 @@ ICQ.DIFF = 3
 
 # Times and windows' sizes
 
-WINDOW.SIZE = 240
+WINDOW.SIZE = 120
 
 ALL.TIMES = data.frame(time = 0:23, window = rep(WINDOW.SIZE, 24))
 PART.TIMES = data.frame(time = seq(0, 23, 4), window = rep(WINDOW.SIZE, 6))
@@ -39,7 +39,7 @@ source("timeUtils.R")
 source("dataLoading.R")
 source("dataProcessing.R")
 
-shifts_files = list("data/Shifts_Mario_01-14_12-14.csv", "data/Shifts_Mario_01-15_21-01-16.csv")
+shifts_files = list("data/Shifts_Mario_01-14_12-14.csv", "data/Shifts_Mario_01-15_31-01-16.csv")
 trips_months = data.frame(m = c(rep(1:12, 2), 1), y = c(rep(14, 12), rep(15, 12), 16))
 
 shifts_files_12.14 = list("data/Shifts_Mario_12-14.csv", "data/Shifts_Mario_01-15_21-01-16.csv")
@@ -54,11 +54,16 @@ ratios_bases = c("shifts_len", "shifts_len")
 ratios_names = c("occup", "inc")
 
 
-data = readData(shifts_files, trips_months)
-rates = processData(data)
+data2 = readData(shifts_files, trips_months)
+rates2 = processData(data2)
+
+
 
 #time_mats = create_time_mats(data, mat_names, mat_source, mat_func)
 #rates = create_rates(time_mats, ratios_data, ratios_bases, ratios_names, app.date)
+
+#rates = create_rates(time_mats)
+#rates3 = create_rates2(time_mats)
 
 
 data_12.14 = readData(shifts_files_12.14, trips_months_12.14)
