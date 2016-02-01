@@ -1,6 +1,6 @@
 vect_compare <- function(data, rates = TRUE, weekdays = TRUE, weekends = FALSE, all.pre = TRUE, prev.year = FALSE, 
                          pre_from = NULL, pre_to = NULL, post_from = NULL, post_to = NULL, plot = TRUE,
-                         sample.size = 300, na.rm = FALSE){
+                         sample.size = 200, na.rm = FALSE){
   
   if (rates){
     d = data$vect_rates
@@ -41,6 +41,7 @@ vect_compare <- function(data, rates = TRUE, weekdays = TRUE, weekends = FALSE, 
     pre_to = as.Date(max(pre_dates))
   }
   
+
   if (!all.pre | prev.year) {
     if (prev.year){
       pre_from = as.POSIXlt(post_from)
@@ -64,6 +65,7 @@ vect_compare <- function(data, rates = TRUE, weekdays = TRUE, weekends = FALSE, 
   print("Wicox test :")
   print(wilcox.test(pre_d, post_d))
   
+<<<<<<< HEAD
   if (plot){
     
     if (na.rm){
@@ -97,8 +99,8 @@ vect_compare <- function(data, rates = TRUE, weekdays = TRUE, weekends = FALSE, 
     abline(v = length(pre_plot), col = "green")
     abline(h = pre_mean, col = "orange", lty=2, lwd = 2)
     abline(h = post_mean, col = "blue", lty=2, lwd = 2)
-    
-  }
-  
+=======
+  #print(deparse(substitute(data)))
+
 }
   
